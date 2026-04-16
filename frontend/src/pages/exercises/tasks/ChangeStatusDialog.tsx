@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Form } from "react-bootstrap";
 import FormDialog from "../../../components/FormDialog";
 import { fetchApi } from "../../../utils/apiClient";
+import { triggerConfetti } from "../../../utils/confetti";
 import { ExampleTask, TaskStatus } from "./types";
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -40,6 +41,7 @@ const ChangeStatusDialog = ({ show, task, onHide, onChanged }: ChangeStatusDialo
         method: "PUT",
         body: JSON.stringify({ status }),
       });
+      if (status === TaskStatus.COMPLETED) triggerConfetti();
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
