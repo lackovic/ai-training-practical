@@ -59,3 +59,12 @@ export const handleReleaseBay = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+export const handleGetOccupancy = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await ParkingService.getOccupancyHistory();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};

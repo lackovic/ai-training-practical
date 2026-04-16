@@ -1,4 +1,4 @@
-import { PrismaClient, BayStatus } from '@prisma/client';
+import { PrismaClient, BayStatus, BayEventType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -53,4 +53,12 @@ export const updateBayStatus = async (
   details: { driverName: string | null; vehicleRegistration: string | null } = { driverName: null, vehicleRegistration: null }
 ) => {
   return prisma.parkingBay.update({ where: { id }, data: { status, ...details } });
+};
+
+export const createBayEvent = async (bayId: number, zoneId: number, eventType: BayEventType) => {
+  return prisma.bayEvent.create({ data: { bayId, zoneId, eventType } });
+};
+
+export const findAllBayEvents = async () => {
+  return prisma.bayEvent.findMany({ orderBy: { createdAt: 'asc' } });
 };

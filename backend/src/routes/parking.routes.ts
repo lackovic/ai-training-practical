@@ -6,6 +6,7 @@ import {
   handleBookBay,
   handleReleaseBay,
   handleSearchBays,
+  handleGetOccupancy,
 } from '../controllers/parking.controller';
 import {
   zoneIdValidationRules,
@@ -31,5 +32,8 @@ router.post('/bays/:bayId/book', bookBayValidationRules, validate, asyncHandler(
 
 // POST /api/parking/bays/:bayId/release — mark a bay as available
 router.post('/bays/:bayId/release', bayIdValidationRules, validate, asyncHandler(handleReleaseBay));
+
+// GET /api/parking/occupancy — occupancy history for charting
+router.get('/occupancy', asyncHandler(handleGetOccupancy));
 
 export default router;
