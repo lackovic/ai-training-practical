@@ -18,6 +18,7 @@ import { ExampleTask, TaskPriority, TaskStatus } from "./types";
 import NewTaskDialog from "./NewTaskDialog";
 import ChangeStatusDialog from "./ChangeStatusDialog";
 import DeleteTaskDialog from "./DeleteTaskDialog";
+import EditTaskDialog from "./EditTaskDialog";
 
 const priorityVariantMap: Record<TaskPriority, string> = {
   [TaskPriority.LOW]: "success",
@@ -74,9 +75,10 @@ interface TaskTableProps {
   tasks: ExampleTask[];
   onChangeStatus: (task: ExampleTask) => void;
   onDelete: (task: ExampleTask) => void;
+  onEdit: (task: ExampleTask) => void;
 }
 
-const TaskTable = ({ tasks, onChangeStatus, onDelete }: TaskTableProps) => {
+const TaskTable = ({ tasks, onChangeStatus, onDelete, onEdit }: TaskTableProps) => {
   return (
     <Table responsive>
       <thead>
@@ -107,7 +109,7 @@ const TaskTable = ({ tasks, onChangeStatus, onDelete }: TaskTableProps) => {
             </td>
             <td className="text-end">
               <Button variant="light" size="sm" onClick={() => onChangeStatus(task)}>Change Status</Button>{" "}
-              <Button variant="light" size="sm">View</Button>{" "}
+              <Button variant="light" size="sm" onClick={() => onEdit(task)}>Edit</Button>{" "}
               <Button variant="outline-danger" size="sm" onClick={() => onDelete(task)}>Delete</Button>{" "}
             </td>
           </tr>
@@ -128,9 +130,10 @@ interface TaskBoardProps {
   onNewTask: () => void;
   onChangeStatus: (task: ExampleTask) => void;
   onDelete: (task: ExampleTask) => void;
+  onEdit: (task: ExampleTask) => void;
 }
 
-const TaskBoard = ({ title, tasks, onNewTask, onChangeStatus, onDelete }: TaskBoardProps) => {
+const TaskBoard = ({ title, tasks, onNewTask, onChangeStatus, onDelete, onEdit }: TaskBoardProps) => {
   return (
     <Card className="mb-3">
       <Card.Body>
@@ -150,7 +153,7 @@ const TaskBoard = ({ title, tasks, onNewTask, onChangeStatus, onDelete }: TaskBo
             </div>
           </Col>
         </Row>
-        <TaskTable tasks={tasks} onChangeStatus={onChangeStatus} onDelete={onDelete} />
+        <TaskTable tasks={tasks} onChangeStatus={onChangeStatus} onDelete={onDelete} onEdit={onEdit} />
       </Card.Body>
     </Card>
   );
@@ -164,6 +167,7 @@ const ExerciseTaskList = () => {
   const [showNewTaskDialog, setShowNewTaskDialog] = useState<boolean>(false);
   const [changeStatusTask, setChangeStatusTask] = useState<ExampleTask | null>(null);
   const [deleteTask, setDeleteTask] = useState<ExampleTask | null>(null);
+  const [editTask, setEditTask] = useState<ExampleTask | null>(null);
 
   const loadTasks = async () => {
     setIsLoading(true);
@@ -275,9 +279,9 @@ const ExerciseTaskList = () => {
 
         {!isLoading && !error && (
           <>
-            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} />
-            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} />
-            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} />
+            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
+            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
+            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
           </>
         )}
 
@@ -297,6 +301,12 @@ const ExerciseTaskList = () => {
           task={deleteTask}
           onHide={() => setDeleteTask(null)}
           onDeleted={() => { setDeleteTask(null); loadTasks(); }}
+        />
+        <EditTaskDialog
+          show={editTask !== null}
+          task={editTask}
+          onHide={() => setEditTask(null)}
+          onUpdated={() => { setEditTask(null); loadTasks(); }}
         />
       </Container>
     </React.Fragment>
