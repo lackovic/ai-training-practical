@@ -10,38 +10,12 @@ import {
   Card,
   Spinner,
   Alert,
-  Modal,
-  Form,
 } from "react-bootstrap";
 import { Plus, Copy, Sparkles } from "lucide-react";
 
-// Import backend types (adjust path if needed, or define locally/shared)
-// Assuming types might be manually defined or generated elsewhere if not directly importable
-// For demonstration, let's define simplified versions inline or assume they exist
-// import { ExampleTask, TaskStatus, TaskPriority } from "../../../../../backend/src/types/prisma-types"; // Keep commented out
-
-import { fetchApi } from "../../../utils/apiClient"; // Path should be correct relative to new location
-
-// UNCOMMENTED: Manual type definitions based on Prisma schema:
-enum TaskStatus {
-  UPCOMING = 'UPCOMING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED'
-}
-enum TaskPriority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH'
-}
-interface ExampleTask {
-  id: string;
-  name: string;
-  description: string | null;
-  status: TaskStatus;
-  priority: TaskPriority;
-  createdAt: string; // Dates will be strings from JSON
-  updatedAt: string;
-}
+import { fetchApi } from "../../../utils/apiClient";
+import { ExampleTask, TaskPriority, TaskStatus } from "./types";
+import NewTaskDialog from "./NewTaskDialog";
 
 const priorityVariantMap: Record<TaskPriority, string> = {
   [TaskPriority.LOW]: "success",
@@ -175,29 +149,12 @@ const TaskBoard = ({ title, tasks, onNewTask }: TaskBoardProps) => {
   );
 };
 
-interface NewTaskForm {
-  name: string;
-  description: string;
-  priority: TaskPriority;
-  status: TaskStatus;
-}
-
-const emptyForm: NewTaskForm = {
-  name: '',
-  description: '',
-  priority: TaskPriority.MEDIUM,
-  status: TaskStatus.UPCOMING,
-};
-
 const ExerciseTaskList = () => {
   const [tasks, setTasks] = useState<ExampleTask[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showIntroAlert, setShowIntroAlert] = useState<boolean>(true);
-  const [showNewTaskModal, setShowNewTaskModal] = useState<boolean>(false);
-  const [newTaskForm, setNewTaskForm] = useState<NewTaskForm>(emptyForm);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showNewTaskDialog, setShowNewTaskDialog] = useState<boolean>(false);
 
   const loadTasks = async () => {
     setIsLoading(true);
@@ -216,42 +173,6 @@ const ExerciseTaskList = () => {
   useEffect(() => {
     loadTasks();
   }, []);
-
-  const handleOpenNewTaskModal = () => {
-    setNewTaskForm(emptyForm);
-    setSaveError(null);
-    setShowNewTaskModal(true);
-  };
-
-  const handleCloseNewTaskModal = () => {
-    setShowNewTaskModal(false);
-  };
-
-  const handleCreateTask = async () => {
-    if (!newTaskForm.name.trim()) {
-      setSaveError('Task name is required.');
-      return;
-    }
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await fetchApi<ExampleTask>('/exercises/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: newTaskForm.name.trim(),
-          description: newTaskForm.description.trim() || undefined,
-          priority: newTaskForm.priority,
-          status: newTaskForm.status,
-        }),
-      });
-      setShowNewTaskModal(false);
-      await loadTasks();
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to create task');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const upcomingTasks = tasks.filter((task) => task.status === TaskStatus.UPCOMING);
   const inProgressTasks = tasks.filter((task) => task.status === TaskStatus.IN_PROGRESS);
@@ -345,74 +266,20 @@ const ExerciseTaskList = () => {
 
         {!isLoading && !error && (
           <>
-            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={handleOpenNewTaskModal} />
-            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={handleOpenNewTaskModal} />
-            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={handleOpenNewTaskModal} />
+            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} />
+            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} />
+            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} />
           </>
         )}
 
-        <Modal show={showNewTaskModal} onHide={handleCloseNewTaskModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>New Task</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {saveError && <Alert variant="danger">{saveError}</Alert>}
-            <Form>
-              <Form.Group className="mb-3">
-                <Form.Label>Name <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="text"
-                  value={newTaskForm.name}
-                  onChange={(e) => setNewTaskForm({ ...newTaskForm, name: e.target.value })}
-                  placeholder="Enter task name"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={newTaskForm.description}
-                  onChange={(e) => setNewTaskForm({ ...newTaskForm, description: e.target.value })}
-                  placeholder="Enter task description (optional)"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Priority</Form.Label>
-                <Form.Select
-                  value={newTaskForm.priority}
-                  onChange={(e) => setNewTaskForm({ ...newTaskForm, priority: e.target.value as TaskPriority })}
-                >
-                  <option value={TaskPriority.LOW}>Low</option>
-                  <option value={TaskPriority.MEDIUM}>Medium</option>
-                  <option value={TaskPriority.HIGH}>High</option>
-                </Form.Select>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Status</Form.Label>
-                <Form.Select
-                  value={newTaskForm.status}
-                  onChange={(e) => setNewTaskForm({ ...newTaskForm, status: e.target.value as TaskStatus })}
-                >
-                  <option value={TaskStatus.UPCOMING}>Upcoming</option>
-                  <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
-                  <option value={TaskStatus.COMPLETED}>Completed</option>
-                </Form.Select>
-              </Form.Group>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseNewTaskModal} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleCreateTask} disabled={isSaving}>
-              {isSaving ? 'Creating...' : 'Create'}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+        <NewTaskDialog
+          show={showNewTaskDialog}
+          onHide={() => setShowNewTaskDialog(false)}
+          onCreated={() => { setShowNewTaskDialog(false); loadTasks(); }}
+        />
       </Container>
     </React.Fragment>
   );
 };
 
-export default ExerciseTaskList; 
+export default ExerciseTaskList;
