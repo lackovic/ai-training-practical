@@ -24,17 +24,17 @@ const sidebarNavigation: { title: string; pages: SidebarItemsType[] }[] = [
       },
       {
         href: "/exercises/tasks/list",
-        title: "Task List Exercise",
+        title: "Task List",
         icon: List,
       },
       {
         href: "/exercises/parking",
-        title: "Car Park Exercise",
+        title: "Car Park Availability",
         icon: Car,
       },
       {
         href: "/exercises/analytics-chart",
-        title: "Analytics Charts Exercise",
+        title: "Analytics Chart",
         icon: PieChart,
       },
       {
