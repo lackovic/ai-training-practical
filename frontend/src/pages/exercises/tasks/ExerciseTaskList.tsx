@@ -10,6 +10,7 @@ import {
   Card,
   Spinner,
   Alert,
+  Form,
 } from "react-bootstrap";
 import { Plus, RefreshCw, Pencil, Trash2 } from "lucide-react";
 
@@ -129,6 +130,8 @@ const ExerciseTaskList = () => {
   const [changeStatusTask, setChangeStatusTask] = useState<ExampleTask | null>(null);
   const [deleteTask, setDeleteTask] = useState<ExampleTask | null>(null);
   const [editTask, setEditTask] = useState<ExampleTask | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "ALL">("ALL");
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
 
   const loadTasks = async () => {
     setIsLoading(true);
@@ -148,9 +151,17 @@ const ExerciseTaskList = () => {
     loadTasks();
   }, []);
 
-  const upcomingTasks = tasks.filter((task) => task.status === TaskStatus.UPCOMING);
-  const inProgressTasks = tasks.filter((task) => task.status === TaskStatus.IN_PROGRESS);
-  const completedTasks = tasks.filter((task) => task.status === TaskStatus.COMPLETED);
+  const visibleTasks = tasks
+    .filter((task) => priorityFilter === "ALL" || task.priority === priorityFilter)
+    .sort((a, b) =>
+      sortBy === "name"
+        ? a.name.localeCompare(b.name)
+        : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+  const upcomingTasks = visibleTasks.filter((task) => task.status === TaskStatus.UPCOMING);
+  const inProgressTasks = visibleTasks.filter((task) => task.status === TaskStatus.IN_PROGRESS);
+  const completedTasks = visibleTasks.filter((task) => task.status === TaskStatus.COMPLETED);
 
   return (
     <React.Fragment>
@@ -174,6 +185,28 @@ const ExerciseTaskList = () => {
 
         {!isLoading && !error && (
           <>
+            <div className="d-flex gap-2 mb-3">
+              <Form.Select
+                size="sm"
+                style={{ width: 'auto' }}
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value as TaskPriority | "ALL")}
+              >
+                <option value="ALL">All priorities</option>
+                <option value={TaskPriority.LOW}>Low</option>
+                <option value={TaskPriority.MEDIUM}>Medium</option>
+                <option value={TaskPriority.HIGH}>High</option>
+              </Form.Select>
+              <Form.Select
+                size="sm"
+                style={{ width: 'auto' }}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "date" | "name")}
+              >
+                <option value="date">Sort by date</option>
+                <option value="name">Sort by name</option>
+              </Form.Select>
+            </div>
             <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
             <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
             <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} onDelete={setDeleteTask} onEdit={setEditTask} />
