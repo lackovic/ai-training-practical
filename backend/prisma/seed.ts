@@ -1,4 +1,4 @@
-import { PrismaClient, TaskPriority, TaskStatus } from '@prisma/client';
+import { PrismaClient, TaskPriority, TaskStatus, BayStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -125,6 +125,39 @@ async function main() {
     });
   }
   console.log(`Monthly analytics data seeded for ${analyticsData.length} months.`);
+
+  // Parking zones and bays
+  console.log('Seeding parking zones and bays...');
+  await prisma.parkingBay.deleteMany({});
+  await prisma.parkingZone.deleteMany({});
+
+  const zones = [
+    { name: 'Zone A', description: 'Ground floor — north wing' },
+    { name: 'Zone B', description: 'Ground floor — south wing' },
+    { name: 'Zone C', description: 'First floor — rooftop' },
+  ];
+
+  // Mix of statuses: roughly 60% available, 40% occupied
+  const bayStatuses: BayStatus[] = [
+    BayStatus.AVAILABLE, BayStatus.AVAILABLE, BayStatus.AVAILABLE,
+    BayStatus.OCCUPIED,  BayStatus.AVAILABLE, BayStatus.OCCUPIED,
+    BayStatus.AVAILABLE, BayStatus.AVAILABLE, BayStatus.OCCUPIED,
+    BayStatus.AVAILABLE,
+  ];
+
+  for (const zone of zones) {
+    const created = await prisma.parkingZone.create({ data: zone });
+    for (let i = 1; i <= 10; i++) {
+      await prisma.parkingBay.create({
+        data: {
+          bayNumber: String(i).padStart(2, '0'),
+          status: bayStatuses[i - 1],
+          zoneId: created.id,
+        },
+      });
+    }
+    console.log(`Created zone "${zone.name}" with 10 bays.`);
+  }
 
   console.log(`Seeding finished.`);
 }

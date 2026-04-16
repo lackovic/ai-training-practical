@@ -45,6 +45,32 @@ model ExampleTask {
   updatedAt DateTime @updatedAt
 }
 
+enum BayStatus {
+  AVAILABLE
+  OCCUPIED
+}
+
+model ParkingZone {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?
+  bays        ParkingBay[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model ParkingBay {
+  id        Int        @id @default(autoincrement())
+  bayNumber String
+  status    BayStatus  @default(AVAILABLE)
+  zone      ParkingZone @relation(fields: [zoneId], references: [id])
+  zoneId    Int
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([zoneId, bayNumber])
+}
+
 model MonthlyAnalytics {
   id              Int @id @default(autoincrement())
   month           Int // 1 for January, 12 for December
