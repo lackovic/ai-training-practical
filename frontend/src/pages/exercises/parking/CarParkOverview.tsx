@@ -36,6 +36,57 @@ function getAvailabilityLabel(availableBays: number, totalBays: number): string 
   return 'Full';
 }
 
+const BAY_BORDER = '2px solid rgba(255,255,255,0.25)';
+
+interface BaySquareProps {
+  bay: ParkingBay;
+  openSide: 'top' | 'bottom';
+  isActioning: boolean;
+  onClick: () => void;
+}
+
+const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
+  const isAvailable = bay.status === 'AVAILABLE';
+  const bg = isActioning ? '#6c757d' : isAvailable ? '#198754' : '#dc3545';
+  return (
+    <div
+      title={`Bay ${bay.bayNumber} — ${isAvailable ? 'Available (click to book)' : 'Occupied (click to release)'}`}
+      onClick={() => !isActioning && onClick()}
+      style={{
+        width: '64px',
+        height: '80px',
+        flexShrink: 0,
+        backgroundColor: bg,
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+        cursor: isActioning ? 'default' : 'pointer',
+        fontSize: '0.75rem',
+        fontWeight: '600',
+        borderTop: openSide === 'top' ? 'none' : BAY_BORDER,
+        borderBottom: openSide === 'bottom' ? 'none' : BAY_BORDER,
+        borderLeft: BAY_BORDER,
+        borderRight: BAY_BORDER,
+        borderRadius: openSide === 'bottom' ? '4px 4px 0 0' : '0 0 4px 4px',
+        userSelect: 'none',
+        transition: 'background-color 0.15s',
+      }}
+    >
+      {isActioning ? (
+        <Spinner animation="border" size="sm" />
+      ) : (
+        <>
+          <span>{bay.bayNumber}</span>
+          <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>{isAvailable ? 'free' : 'taken'}</span>
+        </>
+      )}
+    </div>
+  );
+};
+
 const CarParkOverview = () => {
   const [zones, setZones] = useState<ParkingZone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +139,10 @@ const CarParkOverview = () => {
       setActioningBayId(null);
     }
   };
+
+  const midpoint = Math.ceil(bays.length / 2);
+  const topBays = bays.slice(0, midpoint);
+  const bottomBays = bays.slice(midpoint);
 
   return (
     <Card>
@@ -172,38 +227,52 @@ const CarParkOverview = () => {
             )}
             {baysError && <Alert variant="danger">Failed to load bays: {baysError}</Alert>}
             {!baysLoading && !baysError && (
-              <Row xs={2} sm={3} md={4} lg={5} className="g-3">
-                {bays.map((bay) => {
-                  const isAvailable = bay.status === 'AVAILABLE';
-                  const isActioning = actioningBayId === bay.id;
-                  return (
-                    <Col key={bay.id}>
-                      <Card
-                        className="h-100 text-center"
-                        style={{ borderTop: `4px solid var(--bs-${isAvailable ? 'success' : 'danger'})` }}
-                      >
-                        <Card.Body className="p-2 d-flex flex-column align-items-center justify-content-between gap-2">
-                          <div className="fw-bold">Bay {bay.bayNumber}</div>
-                          <span className={`badge bg-${isAvailable ? 'success' : 'danger'}`}>
-                            {isAvailable ? 'Available' : 'Occupied'}
-                          </span>
-                          <Button
-                            variant={isAvailable ? 'outline-danger' : 'outline-success'}
-                            size="sm"
-                            className="w-100"
-                            disabled={isActioning}
-                            onClick={() => handleBayAction(bay)}
-                          >
-                            {isActioning
-                              ? <Spinner animation="border" size="sm" />
-                              : isAvailable ? 'Book' : 'Release'}
-                          </Button>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  );
-                })}
-              </Row>
+              <>
+                <div style={{ background: '#ced4da', borderRadius: '8px', padding: '12px', overflowX: 'auto' }}>
+                  {/* Top row — bays open toward the lane below */}
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    {topBays.map((bay) => (
+                      <BaySquare
+                        key={bay.id}
+                        bay={bay}
+                        openSide="bottom"
+                        isActioning={actioningBayId === bay.id}
+                        onClick={() => handleBayAction(bay)}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Driving lane */}
+                  <div style={{ height: '40px', background: '#495057', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ width: '100%', borderTop: '2px dashed rgba(173,181,189,0.5)' }} />
+                  </div>
+
+                  {/* Bottom row — bays open toward the lane above */}
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    {bottomBays.map((bay) => (
+                      <BaySquare
+                        key={bay.id}
+                        bay={bay}
+                        openSide="top"
+                        isActioning={actioningBayId === bay.id}
+                        onClick={() => handleBayAction(bay)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '0.8rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '12px', height: '12px', background: '#198754', borderRadius: '2px', display: 'inline-block' }} />
+                    Available
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '12px', height: '12px', background: '#dc3545', borderRadius: '2px', display: 'inline-block' }} />
+                    Occupied
+                  </span>
+                </div>
+              </>
             )}
           </>
         )}
