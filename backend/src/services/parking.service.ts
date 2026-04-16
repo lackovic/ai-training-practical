@@ -25,6 +25,10 @@ export const getBaysByZone = async (zoneId: number) => {
   return ParkingRepository.findBaysByZoneId(zoneId);
 };
 
+export const searchBays = async (query: string) => {
+  return ParkingRepository.searchOccupiedBays(query);
+};
+
 export const bookBay = async (bayId: number, driverName: string, vehicleRegistration: string) => {
   const bay = await ParkingRepository.findBayById(bayId);
   if (!bay) return null;

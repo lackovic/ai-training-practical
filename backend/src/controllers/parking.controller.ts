@@ -1,6 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import * as ParkingService from '../services/parking.service';
 
+export const handleSearchBays = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = req.query.q as string;
+    const results = await ParkingService.searchBays(q);
+    res.json(results);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const handleGetAllZones = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const zones = await ParkingService.getAllZonesWithAvailability();

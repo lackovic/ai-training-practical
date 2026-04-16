@@ -5,11 +5,13 @@ import {
   handleGetBaysByZone,
   handleBookBay,
   handleReleaseBay,
+  handleSearchBays,
 } from '../controllers/parking.controller';
 import {
   zoneIdValidationRules,
   bayIdValidationRules,
   bookBayValidationRules,
+  searchValidationRules,
   validate,
 } from '../middleware/parking.validator';
 
@@ -17,6 +19,9 @@ const router = Router();
 
 // GET /api/parking/zones — all zones with availability counts
 router.get('/zones', asyncHandler(handleGetAllZones));
+
+// GET /api/parking/bays/search?q= — search occupied bays by driver or vehicle reg
+router.get('/bays/search', searchValidationRules, validate, asyncHandler(handleSearchBays));
 
 // GET /api/parking/zones/:zoneId/bays — bays for a specific zone
 router.get('/zones/:zoneId/bays', zoneIdValidationRules, validate, asyncHandler(handleGetBaysByZone));

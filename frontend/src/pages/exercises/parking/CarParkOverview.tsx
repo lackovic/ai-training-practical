@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Row, Col, Card, Spinner, Alert, Button, Modal, Form } from 'react-bootstrap';
-import { ArrowLeft } from 'lucide-react';
+import { Row, Col, Card, Spinner, Alert, Button, Modal, Form, Table, InputGroup } from 'react-bootstrap';
+import { ArrowLeft, Search, X } from 'lucide-react';
 import { fetchApi } from '../../../utils/apiClient';
 
 const POLL_INTERVAL = 5000;
@@ -21,6 +21,10 @@ interface ParkingBay {
   driverName: string | null;
   vehicleRegistration: string | null;
   zoneId: number;
+}
+
+interface SearchResult extends ParkingBay {
+  zone: { id: number; name: string };
 }
 
 function getAvailabilityVariant(availableBays: number, totalBays: number): string {
@@ -112,6 +116,10 @@ const CarParkOverview = () => {
   const [driverName, setDriverName] = useState('');
   const [vehicleReg, setVehicleReg] = useState('');
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   const refreshZones = useCallback(() =>
     fetchApi<ParkingZone[]>('/parking/zones').then((data) => setZones(data ?? [])),
   []);
@@ -160,6 +168,25 @@ const CarParkOverview = () => {
       .finally(() => setBaysLoading(false));
   };
 
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const data = await fetchApi<SearchResult[]>(`/parking/bays/search?q=${encodeURIComponent(q.trim())}`);
+      setSearchResults(data ?? []);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    const timeout = setTimeout(() => runSearch(searchQuery), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, runSearch]);
+
   const refreshBaysAndZones = async (zoneId: number) => {
     const [updatedBays, updatedZones] = await Promise.all([
       fetchApi<ParkingBay[]>(`/parking/zones/${zoneId}/bays`),
@@ -194,6 +221,7 @@ const CarParkOverview = () => {
     try {
       await fetchApi(`/parking/bays/${bookingBay.id}/release`, { method: 'POST' });
       await refreshBaysAndZones(bookingBay.zoneId);
+      if (searchQuery.trim()) await runSearch(searchQuery);
       setBookingBay(null);
     } catch (err: any) {
       setBaysError(err.message);
@@ -255,6 +283,63 @@ const CarParkOverview = () => {
         <Card.Body>
           {!selectedZone && (
             <>
+              <InputGroup className="mb-3">
+                <InputGroup.Text><Search size={14} /></InputGroup.Text>
+                <Form.Control
+                  placeholder="Search by driver name or vehicle registration…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <Button variant="outline-secondary" onClick={() => setSearchQuery('')}>
+                    <X size={14} />
+                  </Button>
+                )}
+              </InputGroup>
+
+              {searchQuery.trim() && (
+                <>
+                  {searchLoading && <div className="text-center py-3"><Spinner animation="border" size="sm" /></div>}
+                  {!searchLoading && searchResults.length === 0 && (
+                    <p className="text-muted mb-0">No vehicles found matching "{searchQuery}".</p>
+                  )}
+                  {!searchLoading && searchResults.length > 0 && (
+                    <Table hover responsive size="sm" className="mb-0">
+                      <thead>
+                        <tr>
+                          <th>Zone</th>
+                          <th>Bay</th>
+                          <th>Driver</th>
+                          <th>Vehicle</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {searchResults.map((result) => (
+                          <tr key={result.id}>
+                            <td>{result.zone.name}</td>
+                            <td>{result.bayNumber}</td>
+                            <td>{result.driverName ?? '—'}</td>
+                            <td>{result.vehicleRegistration ?? '—'}</td>
+                            <td>
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                onClick={() => openBookingModal(result)}
+                              >
+                                Release
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </>
+              )}
+
+              {!searchQuery.trim() && (
+                <>
               {loading && (
                 <div className="text-center py-4">
                   <Spinner animation="border" size="sm" className="me-2" />
@@ -298,6 +383,8 @@ const CarParkOverview = () => {
                     );
                   })}
                 </Row>
+              )}
+                </>
               )}
             </>
           )}

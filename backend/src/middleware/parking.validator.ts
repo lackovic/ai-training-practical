@@ -1,4 +1,4 @@
-import { param, body, validationResult } from 'express-validator';
+import { param, body, query, validationResult } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
 
 export const zoneIdValidationRules = [
@@ -7,6 +7,10 @@ export const zoneIdValidationRules = [
 
 export const bayIdValidationRules = [
   param('bayId').isInt({ min: 1 }).withMessage('bayId must be a positive integer'),
+];
+
+export const searchValidationRules = [
+  query('q').trim().notEmpty().withMessage('Search query q is required'),
 ];
 
 export const bookBayValidationRules = [

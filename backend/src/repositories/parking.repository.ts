@@ -33,6 +33,20 @@ export const findBayById = async (id: number) => {
   return prisma.parkingBay.findUnique({ where: { id } });
 };
 
+export const searchOccupiedBays = async (query: string) => {
+  return prisma.parkingBay.findMany({
+    where: {
+      status: BayStatus.OCCUPIED,
+      OR: [
+        { driverName: { contains: query } },
+        { vehicleRegistration: { contains: query } },
+      ],
+    },
+    include: { zone: { select: { id: true, name: true } } },
+    orderBy: [{ zone: { name: 'asc' } }, { bayNumber: 'asc' }],
+  });
+};
+
 export const updateBayStatus = async (
   id: number,
   status: BayStatus,
