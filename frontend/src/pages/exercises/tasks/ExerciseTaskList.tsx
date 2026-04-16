@@ -16,6 +16,7 @@ import { Plus, Copy, Sparkles } from "lucide-react";
 import { fetchApi } from "../../../utils/apiClient";
 import { ExampleTask, TaskPriority, TaskStatus } from "./types";
 import NewTaskDialog from "./NewTaskDialog";
+import ChangeStatusDialog from "./ChangeStatusDialog";
 
 const priorityVariantMap: Record<TaskPriority, string> = {
   [TaskPriority.LOW]: "success",
@@ -70,9 +71,10 @@ const RevealablePrompt = ({ children }: { children: string }) => {
 
 interface TaskTableProps {
   tasks: ExampleTask[];
+  onChangeStatus: (task: ExampleTask) => void;
 }
 
-const TaskTable = ({ tasks }: TaskTableProps) => {
+const TaskTable = ({ tasks, onChangeStatus }: TaskTableProps) => {
   return (
     <Table responsive>
       <thead>
@@ -102,7 +104,7 @@ const TaskTable = ({ tasks }: TaskTableProps) => {
               </Badge>
             </td>
             <td className="text-end">
-              {" "}
+              <Button variant="light" size="sm" onClick={() => onChangeStatus(task)}>Change Status</Button>{" "}
               <Button variant="light" size="sm">View</Button>{" "}
             </td>
           </tr>
@@ -121,9 +123,10 @@ interface TaskBoardProps {
   title: string;
   tasks: ExampleTask[];
   onNewTask: () => void;
+  onChangeStatus: (task: ExampleTask) => void;
 }
 
-const TaskBoard = ({ title, tasks, onNewTask }: TaskBoardProps) => {
+const TaskBoard = ({ title, tasks, onNewTask, onChangeStatus }: TaskBoardProps) => {
   return (
     <Card className="mb-3">
       <Card.Body>
@@ -143,7 +146,7 @@ const TaskBoard = ({ title, tasks, onNewTask }: TaskBoardProps) => {
             </div>
           </Col>
         </Row>
-        <TaskTable tasks={tasks} />
+        <TaskTable tasks={tasks} onChangeStatus={onChangeStatus} />
       </Card.Body>
     </Card>
   );
@@ -155,6 +158,7 @@ const ExerciseTaskList = () => {
   const [error, setError] = useState<string | null>(null);
   const [showIntroAlert, setShowIntroAlert] = useState<boolean>(true);
   const [showNewTaskDialog, setShowNewTaskDialog] = useState<boolean>(false);
+  const [changeStatusTask, setChangeStatusTask] = useState<ExampleTask | null>(null);
 
   const loadTasks = async () => {
     setIsLoading(true);
@@ -266,9 +270,9 @@ const ExerciseTaskList = () => {
 
         {!isLoading && !error && (
           <>
-            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} />
-            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} />
-            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} />
+            <TaskBoard title={statusMap[TaskStatus.UPCOMING]} tasks={upcomingTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} />
+            <TaskBoard title={statusMap[TaskStatus.IN_PROGRESS]} tasks={inProgressTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} />
+            <TaskBoard title={statusMap[TaskStatus.COMPLETED]} tasks={completedTasks} onNewTask={() => setShowNewTaskDialog(true)} onChangeStatus={setChangeStatusTask} />
           </>
         )}
 
@@ -276,6 +280,12 @@ const ExerciseTaskList = () => {
           show={showNewTaskDialog}
           onHide={() => setShowNewTaskDialog(false)}
           onCreated={() => { setShowNewTaskDialog(false); loadTasks(); }}
+        />
+        <ChangeStatusDialog
+          show={changeStatusTask !== null}
+          task={changeStatusTask}
+          onHide={() => setChangeStatusTask(null)}
+          onChanged={() => { setChangeStatusTask(null); loadTasks(); }}
         />
       </Container>
     </React.Fragment>
