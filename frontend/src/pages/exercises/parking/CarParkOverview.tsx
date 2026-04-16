@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap';
+import { Row, Col, Card, Spinner, Alert, Button, Modal, Form } from 'react-bootstrap';
 import { ArrowLeft } from 'lucide-react';
 import { fetchApi } from '../../../utils/apiClient';
+
+const POLL_INTERVAL = 5000;
 
 interface ParkingZone {
   id: number;
@@ -16,6 +18,8 @@ interface ParkingBay {
   id: number;
   bayNumber: string;
   status: 'AVAILABLE' | 'OCCUPIED';
+  driverName: string | null;
+  vehicleRegistration: string | null;
   zoneId: number;
 }
 
@@ -36,8 +40,6 @@ function getAvailabilityLabel(availableBays: number, totalBays: number): string 
   return 'Full';
 }
 
-const POLL_INTERVAL = 5000;
-
 const BAY_BORDER = '2px solid rgba(255,255,255,0.25)';
 
 interface BaySquareProps {
@@ -50,9 +52,12 @@ interface BaySquareProps {
 const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
   const isAvailable = bay.status === 'AVAILABLE';
   const bg = isActioning ? '#6c757d' : isAvailable ? '#198754' : '#dc3545';
+  const subtitle = isAvailable ? 'free' : (bay.vehicleRegistration ?? 'taken');
   return (
     <div
-      title={`Bay ${bay.bayNumber} — ${isAvailable ? 'Available (click to book)' : 'Occupied (click to release)'}`}
+      title={isAvailable
+        ? `Bay ${bay.bayNumber} — Available`
+        : `Bay ${bay.bayNumber} — ${bay.driverName ?? ''} ${bay.vehicleRegistration ?? ''}`.trim()}
       onClick={() => !isActioning && onClick()}
       style={{
         width: '96px',
@@ -75,6 +80,7 @@ const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
         borderRadius: openSide === 'right' ? '4px 0 0 4px' : '0 4px 4px 0',
         userSelect: 'none',
         transition: 'background-color 0.15s',
+        overflow: 'hidden',
       }}
     >
       {isActioning ? (
@@ -82,7 +88,9 @@ const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
       ) : (
         <>
           <span>{bay.bayNumber}</span>
-          <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>{isAvailable ? 'free' : 'taken'}</span>
+          <span style={{ fontSize: '0.6rem', opacity: 0.85, maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitle}
+          </span>
         </>
       )}
     </div>
@@ -100,6 +108,10 @@ const CarParkOverview = () => {
   const [baysError, setBaysError] = useState<string | null>(null);
   const [actioningBayId, setActioningBayId] = useState<number | null>(null);
 
+  const [bookingBay, setBookingBay] = useState<ParkingBay | null>(null);
+  const [driverName, setDriverName] = useState('');
+  const [vehicleReg, setVehicleReg] = useState('');
+
   const refreshZones = useCallback(() =>
     fetchApi<ParkingZone[]>('/parking/zones').then((data) => setZones(data ?? [])),
   []);
@@ -110,9 +122,6 @@ const CarParkOverview = () => {
       .finally(() => setLoading(false));
   }, [refreshZones]);
 
-  // Keep a ref pointing at the current selectedZone id so the polling
-  // interval (created once at mount) can always read the latest value
-  // without becoming stale.
   const selectedZoneIdRef = useRef<number | null>(null);
   useEffect(() => { selectedZoneIdRef.current = selectedZone?.id ?? null; });
 
@@ -139,7 +148,7 @@ const CarParkOverview = () => {
       }
     }, POLL_INTERVAL);
     return () => clearInterval(id);
-  }, []); // single interval for the component lifetime
+  }, []);
 
   const openZone = (zone: ParkingZone) => {
     setSelectedZone(zone);
@@ -151,21 +160,27 @@ const CarParkOverview = () => {
       .finally(() => setBaysLoading(false));
   };
 
-  const handleBayAction = async (bay: ParkingBay) => {
-    const endpoint = bay.status === 'AVAILABLE'
-      ? `/parking/bays/${bay.id}/book`
-      : `/parking/bays/${bay.id}/release`;
-    setActioningBayId(bay.id);
+  const refreshBaysAndZones = async (zoneId: number) => {
+    const [updatedBays, updatedZones] = await Promise.all([
+      fetchApi<ParkingBay[]>(`/parking/zones/${zoneId}/bays`),
+      fetchApi<ParkingZone[]>('/parking/zones'),
+    ]);
+    setBays(updatedBays ?? []);
+    const freshZones = updatedZones ?? [];
+    setZones(freshZones);
+    setSelectedZone((prev) => prev ? (freshZones.find((z) => z.id === prev.id) ?? prev) : null);
+  };
+
+  const handleBook = async () => {
+    if (!bookingBay) return;
+    setActioningBayId(bookingBay.id);
     try {
-      await fetchApi(endpoint, { method: 'POST' });
-      const [updatedBays, updatedZones] = await Promise.all([
-        fetchApi<ParkingBay[]>(`/parking/zones/${bay.zoneId}/bays`),
-        fetchApi<ParkingZone[]>('/parking/zones'),
-      ]);
-      setBays(updatedBays ?? []);
-      const freshZones = updatedZones ?? [];
-      setZones(freshZones);
-      setSelectedZone((prev) => prev ? (freshZones.find((z) => z.id === prev.id) ?? prev) : null);
+      await fetchApi(`/parking/bays/${bookingBay.id}/book`, {
+        method: 'POST',
+        body: JSON.stringify({ driverName: driverName.trim(), vehicleRegistration: vehicleReg.trim() }),
+      });
+      await refreshBaysAndZones(bookingBay.zoneId);
+      setBookingBay(null);
     } catch (err: any) {
       setBaysError(err.message);
     } finally {
@@ -173,167 +188,244 @@ const CarParkOverview = () => {
     }
   };
 
+  const handleRelease = async () => {
+    if (!bookingBay) return;
+    setActioningBayId(bookingBay.id);
+    try {
+      await fetchApi(`/parking/bays/${bookingBay.id}/release`, { method: 'POST' });
+      await refreshBaysAndZones(bookingBay.zoneId);
+      setBookingBay(null);
+    } catch (err: any) {
+      setBaysError(err.message);
+    } finally {
+      setActioningBayId(null);
+    }
+  };
+
+  const openBookingModal = (bay: ParkingBay) => {
+    setBookingBay(bay);
+    setDriverName('');
+    setVehicleReg('');
+  };
+
+  const isOccupied = bookingBay?.status === 'OCCUPIED';
+  const isActioning = bookingBay ? actioningBayId === bookingBay.id : false;
+  const canBook = driverName.trim().length > 0 && vehicleReg.trim().length > 0;
+
   const midpoint = Math.ceil(bays.length / 2);
   const leftBays = bays.slice(0, midpoint);
   const rightBays = bays.slice(midpoint);
 
   return (
-    <Card>
-      <Card.Header>
-        {selectedZone ? (
-          <div className="d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center gap-2">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => setSelectedZone(null)}
-                className="d-flex align-items-center gap-1 py-0"
-              >
-                <ArrowLeft size={14} />
-                All zones
-              </Button>
-              <Card.Title className="mb-0">{selectedZone.name}</Card.Title>
-            </div>
-            <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
-              <Spinner animation="grow" size="sm" />
-              Live
-            </span>
-          </div>
-        ) : (
-          <div className="d-flex justify-content-between align-items-start">
-            <div>
-              <Card.Title className="mb-0">Car Park Overview</Card.Title>
-              <h6 className="card-subtitle text-muted">Click a zone to manage bays</h6>
-            </div>
-            <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
-              <Spinner animation="grow" size="sm" />
-              Live
-            </span>
-          </div>
-        )}
-      </Card.Header>
-      <Card.Body>
-        {!selectedZone && (
-          <>
-            {loading && (
-              <div className="text-center py-4">
-                <Spinner animation="border" size="sm" className="me-2" />
-                Loading zones…
+    <>
+      <Card>
+        <Card.Header>
+          {selectedZone ? (
+            <div className="d-flex justify-content-between align-items-center">
+              <div className="d-flex align-items-center gap-2">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => setSelectedZone(null)}
+                  className="d-flex align-items-center gap-1 py-0"
+                >
+                  <ArrowLeft size={14} />
+                  All zones
+                </Button>
+                <Card.Title className="mb-0">{selectedZone.name}</Card.Title>
               </div>
-            )}
-            {error && <Alert variant="danger">Failed to load zones: {error}</Alert>}
-            {!loading && !error && (
-              <Row xs={1} sm={2} lg={3} className="g-3">
-                {zones.map((zone) => {
-                  const variant = getAvailabilityVariant(zone.availableBays, zone.totalBays);
-                  const label = getAvailabilityLabel(zone.availableBays, zone.totalBays);
-                  return (
-                    <Col key={zone.id}>
-                      <Card
-                        className="h-100"
-                        style={{ borderTop: `4px solid var(--bs-${variant})`, cursor: 'pointer' }}
-                        onClick={() => openZone(zone)}
-                      >
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-start mb-2">
-                            <Card.Title className="mb-0">{zone.name}</Card.Title>
-                            <span className={`badge bg-${variant}`}>{label}</span>
-                          </div>
-                          {zone.description && (
-                            <p className="text-muted small mb-2">{zone.description}</p>
-                          )}
-                          <div className="mt-2">
-                            <span className="fs-4 fw-bold">{zone.availableBays}</span>
-                            <span className="text-muted"> / {zone.totalBays} available</span>
-                          </div>
-                          <div className="progress mt-2" style={{ height: '6px' }}>
-                            <div
-                              className={`progress-bar bg-${variant}`}
-                              style={{ width: `${zone.totalBays ? (zone.availableBays / zone.totalBays) * 100 : 0}%` }}
-                            />
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  );
-                })}
-              </Row>
-            )}
-          </>
-        )}
-
-        {selectedZone && (
-          <>
-            {baysLoading && (
-              <div className="text-center py-4">
-                <Spinner animation="border" size="sm" className="me-2" />
-                Loading bays…
+              <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+                <Spinner animation="grow" size="sm" />
+                Live
+              </span>
+            </div>
+          ) : (
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <Card.Title className="mb-0">Car Park Overview</Card.Title>
+                <h6 className="card-subtitle text-muted">Click a zone to manage bays</h6>
               </div>
-            )}
-            {baysError && <Alert variant="danger">Failed to load bays: {baysError}</Alert>}
-            {!baysLoading && !baysError && (
-              <>
-                <div style={{ background: '#ced4da', borderRadius: '8px', padding: '16px', display: 'inline-flex', gap: '0' }}>
-                  {/* Left column — bays open toward the aisle on the right */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {leftBays.map((bay) => (
-                      <BaySquare
-                        key={bay.id}
-                        bay={bay}
-                        openSide="right"
-                        isActioning={actioningBayId === bay.id}
-                        onClick={() => handleBayAction(bay)}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Central aisle */}
-                  <div style={{
-                    width: '52px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 0',
-                    color: 'rgba(0,0,0,0.3)',
-                    fontSize: '0.7rem',
-                    userSelect: 'none',
-                  }}>
-                    <span>↓</span>
-                    <span>↑</span>
-                  </div>
-
-                  {/* Right column — bays open toward the aisle on the left */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {rightBays.map((bay) => (
-                      <BaySquare
-                        key={bay.id}
-                        bay={bay}
-                        openSide="left"
-                        isActioning={actioningBayId === bay.id}
-                        onClick={() => handleBayAction(bay)}
-                      />
-                    ))}
-                  </div>
+              <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+                <Spinner animation="grow" size="sm" />
+                Live
+              </span>
+            </div>
+          )}
+        </Card.Header>
+        <Card.Body>
+          {!selectedZone && (
+            <>
+              {loading && (
+                <div className="text-center py-4">
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Loading zones…
                 </div>
+              )}
+              {error && <Alert variant="danger">Failed to load zones: {error}</Alert>}
+              {!loading && !error && (
+                <Row xs={1} sm={2} lg={3} className="g-3">
+                  {zones.map((zone) => {
+                    const variant = getAvailabilityVariant(zone.availableBays, zone.totalBays);
+                    const label = getAvailabilityLabel(zone.availableBays, zone.totalBays);
+                    return (
+                      <Col key={zone.id}>
+                        <Card
+                          className="h-100"
+                          style={{ borderTop: `4px solid var(--bs-${variant})`, cursor: 'pointer' }}
+                          onClick={() => openZone(zone)}
+                        >
+                          <Card.Body>
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <Card.Title className="mb-0">{zone.name}</Card.Title>
+                              <span className={`badge bg-${variant}`}>{label}</span>
+                            </div>
+                            {zone.description && (
+                              <p className="text-muted small mb-2">{zone.description}</p>
+                            )}
+                            <div className="mt-2">
+                              <span className="fs-4 fw-bold">{zone.availableBays}</span>
+                              <span className="text-muted"> / {zone.totalBays} available</span>
+                            </div>
+                            <div className="progress mt-2" style={{ height: '6px' }}>
+                              <div
+                                className={`progress-bar bg-${variant}`}
+                                style={{ width: `${zone.totalBays ? (zone.availableBays / zone.totalBays) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    );
+                  })}
+                </Row>
+              )}
+            </>
+          )}
 
-                {/* Legend */}
-                <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '0.8rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '12px', height: '12px', background: '#198754', borderRadius: '2px', display: 'inline-block' }} />
-                    Available
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '12px', height: '12px', background: '#dc3545', borderRadius: '2px', display: 'inline-block' }} />
-                    Occupied
-                  </span>
+          {selectedZone && (
+            <>
+              {baysLoading && (
+                <div className="text-center py-4">
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Loading bays…
                 </div>
-              </>
-            )}
-          </>
-        )}
-      </Card.Body>
-    </Card>
+              )}
+              {baysError && <Alert variant="danger">Failed to load bays: {baysError}</Alert>}
+              {!baysLoading && !baysError && (
+                <>
+                  <div style={{ background: '#ced4da', borderRadius: '8px', padding: '16px', display: 'inline-flex', gap: '0' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {leftBays.map((bay) => (
+                        <BaySquare
+                          key={bay.id}
+                          bay={bay}
+                          openSide="right"
+                          isActioning={actioningBayId === bay.id}
+                          onClick={() => openBookingModal(bay)}
+                        />
+                      ))}
+                    </div>
+
+                    <div style={{
+                      width: '52px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 0',
+                      color: 'rgba(0,0,0,0.3)',
+                      fontSize: '0.7rem',
+                      userSelect: 'none',
+                    }}>
+                      <span>↓</span>
+                      <span>↑</span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {rightBays.map((bay) => (
+                        <BaySquare
+                          key={bay.id}
+                          bay={bay}
+                          openSide="left"
+                          isActioning={actioningBayId === bay.id}
+                          onClick={() => openBookingModal(bay)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '0.8rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '12px', height: '12px', background: '#198754', borderRadius: '2px', display: 'inline-block' }} />
+                      Available
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '12px', height: '12px', background: '#dc3545', borderRadius: '2px', display: 'inline-block' }} />
+                      Occupied
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </Card.Body>
+      </Card>
+
+      {/* Booking / details modal */}
+      <Modal show={bookingBay !== null} onHide={() => !isActioning && setBookingBay(null)} centered>
+        <Modal.Header closeButton={!isActioning}>
+          <Modal.Title>
+            {isOccupied ? `Bay ${bookingBay?.bayNumber} — Occupied` : `Book Bay ${bookingBay?.bayNumber}`}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {isOccupied ? (
+            <dl className="mb-0 row">
+              <dt className="col-sm-4">Driver</dt>
+              <dd className="col-sm-8">{bookingBay?.driverName ?? '—'}</dd>
+              <dt className="col-sm-4">Vehicle</dt>
+              <dd className="col-sm-8 mb-0">{bookingBay?.vehicleRegistration ?? '—'}</dd>
+            </dl>
+          ) : (
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Driver name</Form.Label>
+                <Form.Control
+                  autoFocus
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && canBook && !isActioning && handleBook()}
+                  placeholder="e.g. Jane Smith"
+                />
+              </Form.Group>
+              <Form.Group>
+                <Form.Label>Vehicle registration</Form.Label>
+                <Form.Control
+                  value={vehicleReg}
+                  onChange={(e) => setVehicleReg(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && canBook && !isActioning && handleBook()}
+                  placeholder="e.g. AB12 CDE"
+                />
+              </Form.Group>
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setBookingBay(null)} disabled={isActioning}>
+            {isOccupied ? 'Close' : 'Cancel'}
+          </Button>
+          {isOccupied ? (
+            <Button variant="success" onClick={handleRelease} disabled={isActioning}>
+              {isActioning ? <Spinner animation="border" size="sm" /> : 'Release bay'}
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={handleBook} disabled={isActioning || !canBook}>
+              {isActioning ? <Spinner animation="border" size="sm" /> : 'Book bay'}
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 };
 

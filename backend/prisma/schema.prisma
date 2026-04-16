@@ -60,13 +60,15 @@ model ParkingZone {
 }
 
 model ParkingBay {
-  id        Int        @id @default(autoincrement())
-  bayNumber String
-  status    BayStatus  @default(AVAILABLE)
-  zone      ParkingZone @relation(fields: [zoneId], references: [id])
-  zoneId    Int
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id                  Int         @id @default(autoincrement())
+  bayNumber           String
+  status              BayStatus   @default(AVAILABLE)
+  driverName          String?
+  vehicleRegistration String?
+  zone                ParkingZone @relation(fields: [zoneId], references: [id])
+  zoneId              Int
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@unique([zoneId, bayNumber])
 }

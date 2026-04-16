@@ -25,7 +25,7 @@ export const getBaysByZone = async (zoneId: number) => {
   return ParkingRepository.findBaysByZoneId(zoneId);
 };
 
-export const bookBay = async (bayId: number) => {
+export const bookBay = async (bayId: number, driverName: string, vehicleRegistration: string) => {
   const bay = await ParkingRepository.findBayById(bayId);
   if (!bay) return null;
   if (bay.status === BayStatus.OCCUPIED) {
@@ -33,7 +33,7 @@ export const bookBay = async (bayId: number) => {
     err.statusCode = 409;
     throw err;
   }
-  return ParkingRepository.updateBayStatus(bayId, BayStatus.OCCUPIED);
+  return ParkingRepository.updateBayStatus(bayId, BayStatus.OCCUPIED, { driverName, vehicleRegistration });
 };
 
 export const releaseBay = async (bayId: number) => {
@@ -44,5 +44,5 @@ export const releaseBay = async (bayId: number) => {
     err.statusCode = 409;
     throw err;
   }
-  return ParkingRepository.updateBayStatus(bayId, BayStatus.AVAILABLE);
+  return ParkingRepository.updateBayStatus(bayId, BayStatus.AVAILABLE, { driverName: null, vehicleRegistration: null });
 };

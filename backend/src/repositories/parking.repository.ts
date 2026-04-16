@@ -33,6 +33,10 @@ export const findBayById = async (id: number) => {
   return prisma.parkingBay.findUnique({ where: { id } });
 };
 
-export const updateBayStatus = async (id: number, status: BayStatus) => {
-  return prisma.parkingBay.update({ where: { id }, data: { status } });
+export const updateBayStatus = async (
+  id: number,
+  status: BayStatus,
+  details: { driverName: string | null; vehicleRegistration: string | null } = { driverName: null, vehicleRegistration: null }
+) => {
+  return prisma.parkingBay.update({ where: { id }, data: { status, ...details } });
 };

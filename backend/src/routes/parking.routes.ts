@@ -9,6 +9,7 @@ import {
 import {
   zoneIdValidationRules,
   bayIdValidationRules,
+  bookBayValidationRules,
   validate,
 } from '../middleware/parking.validator';
 
@@ -21,7 +22,7 @@ router.get('/zones', asyncHandler(handleGetAllZones));
 router.get('/zones/:zoneId/bays', zoneIdValidationRules, validate, asyncHandler(handleGetBaysByZone));
 
 // POST /api/parking/bays/:bayId/book — mark a bay as occupied
-router.post('/bays/:bayId/book', bayIdValidationRules, validate, asyncHandler(handleBookBay));
+router.post('/bays/:bayId/book', bookBayValidationRules, validate, asyncHandler(handleBookBay));
 
 // POST /api/parking/bays/:bayId/release — mark a bay as available
 router.post('/bays/:bayId/release', bayIdValidationRules, validate, asyncHandler(handleReleaseBay));

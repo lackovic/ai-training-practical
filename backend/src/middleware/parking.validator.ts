@@ -1,4 +1,4 @@
-import { param, validationResult } from 'express-validator';
+import { param, body, validationResult } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
 
 export const zoneIdValidationRules = [
@@ -7,6 +7,12 @@ export const zoneIdValidationRules = [
 
 export const bayIdValidationRules = [
   param('bayId').isInt({ min: 1 }).withMessage('bayId must be a positive integer'),
+];
+
+export const bookBayValidationRules = [
+  ...bayIdValidationRules,
+  body('driverName').trim().notEmpty().withMessage('Driver name is required'),
+  body('vehicleRegistration').trim().notEmpty().withMessage('Vehicle registration is required'),
 ];
 
 export const validate = (req: Request, res: Response, next: NextFunction) => {

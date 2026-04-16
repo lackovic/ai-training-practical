@@ -26,7 +26,8 @@ export const handleGetBaysByZone = async (req: Request, res: Response, next: Nex
 export const handleBookBay = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bayId = parseInt(req.params.bayId as string, 10);
-    const bay = await ParkingService.bookBay(bayId);
+    const { driverName, vehicleRegistration } = req.body;
+    const bay = await ParkingService.bookBay(bayId, driverName, vehicleRegistration);
     if (bay === null) {
       return res.status(404).json({ message: 'Bay not found' });
     }
