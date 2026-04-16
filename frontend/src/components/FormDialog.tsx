@@ -9,6 +9,7 @@ interface FormDialogProps {
   isSaving?: boolean;
   error?: string | null;
   submitLabel?: string;
+  submitVariant?: string;
   children: React.ReactNode;
 }
 
@@ -20,6 +21,7 @@ const FormDialog = ({
   isSaving = false,
   error = null,
   submitLabel = "Save",
+  submitVariant = "primary",
   children,
 }: FormDialogProps) => {
   return (
@@ -35,7 +37,7 @@ const FormDialog = ({
         <Button variant="secondary" onClick={onHide} disabled={isSaving}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onSubmit} disabled={isSaving}>
+        <Button variant={submitVariant} onClick={onSubmit} disabled={isSaving}>
           {isSaving ? "Saving..." : submitLabel}
         </Button>
       </Modal.Footer>
