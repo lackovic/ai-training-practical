@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap';
 import { ArrowLeft } from 'lucide-react';
 import { fetchApi } from '../../../utils/apiClient';
@@ -35,6 +35,8 @@ function getAvailabilityLabel(availableBays: number, totalBays: number): string 
   if (ratio > 0) return 'Nearly full';
   return 'Full';
 }
+
+const POLL_INTERVAL = 5000;
 
 const BAY_BORDER = '2px solid rgba(255,255,255,0.25)';
 
@@ -108,6 +110,37 @@ const CarParkOverview = () => {
       .finally(() => setLoading(false));
   }, [refreshZones]);
 
+  // Keep a ref pointing at the current selectedZone id so the polling
+  // interval (created once at mount) can always read the latest value
+  // without becoming stale.
+  const selectedZoneIdRef = useRef<number | null>(null);
+  useEffect(() => { selectedZoneIdRef.current = selectedZone?.id ?? null; });
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const zoneId = selectedZoneIdRef.current;
+      if (zoneId !== null) {
+        Promise.all([
+          fetchApi<ParkingBay[]>(`/parking/zones/${zoneId}/bays`),
+          fetchApi<ParkingZone[]>('/parking/zones'),
+        ]).then(([updatedBays, updatedZones]) => {
+          if (updatedBays) setBays(updatedBays);
+          if (updatedZones) {
+            setZones(updatedZones);
+            setSelectedZone((prev) =>
+              prev ? (updatedZones.find((z) => z.id === prev.id) ?? prev) : null
+            );
+          }
+        }).catch(() => {});
+      } else {
+        fetchApi<ParkingZone[]>('/parking/zones')
+          .then((data) => setZones(data ?? []))
+          .catch(() => {});
+      }
+    }, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, []); // single interval for the component lifetime
+
   const openZone = (zone: ParkingZone) => {
     setSelectedZone(zone);
     setBaysError(null);
@@ -148,23 +181,35 @@ const CarParkOverview = () => {
     <Card>
       <Card.Header>
         {selectedZone ? (
-          <div className="d-flex align-items-center gap-2">
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => setSelectedZone(null)}
-              className="d-flex align-items-center gap-1 py-0"
-            >
-              <ArrowLeft size={14} />
-              All zones
-            </Button>
-            <Card.Title className="mb-0">{selectedZone.name}</Card.Title>
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center gap-2">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setSelectedZone(null)}
+                className="d-flex align-items-center gap-1 py-0"
+              >
+                <ArrowLeft size={14} />
+                All zones
+              </Button>
+              <Card.Title className="mb-0">{selectedZone.name}</Card.Title>
+            </div>
+            <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+              <Spinner animation="grow" size="sm" />
+              Live
+            </span>
           </div>
         ) : (
-          <>
-            <Card.Title>Car Park Overview</Card.Title>
-            <h6 className="card-subtitle text-muted">Live zone availability — click a zone to manage bays</h6>
-          </>
+          <div className="d-flex justify-content-between align-items-start">
+            <div>
+              <Card.Title className="mb-0">Car Park Overview</Card.Title>
+              <h6 className="card-subtitle text-muted">Click a zone to manage bays</h6>
+            </div>
+            <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+              <Spinner animation="grow" size="sm" />
+              Live
+            </span>
+          </div>
         )}
       </Card.Header>
       <Card.Body>
