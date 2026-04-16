@@ -11,7 +11,7 @@ import {
   Spinner,
   Alert,
 } from "react-bootstrap";
-import { Plus, Copy, Sparkles } from "lucide-react";
+import { Plus, Copy, Sparkles, RefreshCw, Pencil, Trash2 } from "lucide-react";
 
 import { fetchApi } from "../../../utils/apiClient";
 import { ExampleTask, TaskPriority, TaskStatus } from "./types";
@@ -108,9 +108,9 @@ const TaskTable = ({ tasks, onChangeStatus, onDelete, onEdit }: TaskTableProps) 
               </Badge>
             </td>
             <td className="text-end">
-              <Button variant="light" size="sm" onClick={() => onChangeStatus(task)}>Change Status</Button>{" "}
-              <Button variant="light" size="sm" onClick={() => onEdit(task)}>Edit</Button>{" "}
-              <Button variant="outline-danger" size="sm" onClick={() => onDelete(task)}>Delete</Button>{" "}
+              <Button variant="light" size="sm" onClick={() => onChangeStatus(task)} title="Change Status"><RefreshCw size={14} /></Button>{" "}
+              <Button variant="light" size="sm" onClick={() => onEdit(task)} title="Edit"><Pencil size={14} /></Button>{" "}
+              <Button variant="outline-danger" size="sm" onClick={() => onDelete(task)} title="Delete"><Trash2 size={14} /></Button>{" "}
             </td>
           </tr>
         ))}
