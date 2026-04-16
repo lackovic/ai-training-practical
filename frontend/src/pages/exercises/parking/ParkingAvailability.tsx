@@ -1,7 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Container, Row, Col, Card } from 'react-bootstrap';
+import { Container, Row, Col, Card, Spinner, Alert } from 'react-bootstrap';
 import { Copy, Sparkles } from 'lucide-react';
+import { fetchApi } from '../../../utils/apiClient';
+
+interface ParkingZone {
+  id: number;
+  name: string;
+  description?: string;
+  totalBays: number;
+  availableBays: number;
+  occupiedBays: number;
+}
+
+function getAvailabilityVariant(availableBays: number, totalBays: number): string {
+  if (totalBays === 0) return 'secondary';
+  const ratio = availableBays / totalBays;
+  if (ratio > 0.6) return 'success';
+  if (ratio >= 0.3) return 'warning';
+  return 'danger';
+}
+
+function getAvailabilityLabel(availableBays: number, totalBays: number): string {
+  if (totalBays === 0) return 'No bays';
+  const ratio = availableBays / totalBays;
+  if (ratio > 0.6) return 'Mostly free';
+  if (ratio >= 0.3) return 'Filling up';
+  return 'Nearly full';
+}
 
 const promptBlockStyle: React.CSSProperties = {
   background: '#f8f9fa',
@@ -44,6 +70,16 @@ const RevealablePrompt = ({ children }: { children: string }) => {
 
 const ParkingAvailability = () => {
   const [showIntroAlert, setShowIntroAlert] = useState(true);
+  const [zones, setZones] = useState<ParkingZone[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchApi<ParkingZone[]>('/parking/zones')
+      .then((data) => setZones(data ?? []))
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <React.Fragment>
@@ -132,23 +168,61 @@ const ParkingAvailability = () => {
           </Card>
         )}
 
-        <Row>
-          <Col>
-            <Card>
-              <Card.Header>
-                <Card.Title>Car Park Overview</Card.Title>
-                <h6 className="card-subtitle text-muted">
-                  Zone availability will be displayed here.
-                </h6>
-              </Card.Header>
-              <Card.Body>
-                <div className="text-center text-muted py-4">
-                  No data yet — complete the tasks above to build this feature.
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+        <Card>
+          <Card.Header>
+            <Card.Title>Car Park Overview</Card.Title>
+            <h6 className="card-subtitle text-muted">
+              Live zone availability
+            </h6>
+          </Card.Header>
+          <Card.Body>
+            {loading && (
+              <div className="text-center py-4">
+                <Spinner animation="border" size="sm" className="me-2" />
+                Loading zones…
+              </div>
+            )}
+            {error && (
+              <Alert variant="danger">Failed to load zones: {error}</Alert>
+            )}
+            {!loading && !error && (
+              <Row xs={1} sm={2} lg={3} className="g-3">
+                {zones.map((zone) => {
+                  const variant = getAvailabilityVariant(zone.availableBays, zone.totalBays);
+                  const label = getAvailabilityLabel(zone.availableBays, zone.totalBays);
+                  const borderStyle: React.CSSProperties = {
+                    borderTop: `4px solid var(--bs-${variant})`,
+                  };
+                  return (
+                    <Col key={zone.id}>
+                      <Card className="h-100" style={borderStyle}>
+                        <Card.Body>
+                          <div className="d-flex justify-content-between align-items-start mb-2">
+                            <Card.Title className="mb-0">{zone.name}</Card.Title>
+                            <span className={`badge bg-${variant}`}>{label}</span>
+                          </div>
+                          {zone.description && (
+                            <p className="text-muted small mb-2">{zone.description}</p>
+                          )}
+                          <div className="mt-2">
+                            <span className="fs-4 fw-bold">{zone.availableBays}</span>
+                            <span className="text-muted"> / {zone.totalBays} available</span>
+                          </div>
+                          <div className="progress mt-2" style={{ height: '6px' }}>
+                            <div
+                              className={`progress-bar bg-${variant}`}
+                              style={{ width: `${zone.totalBays ? (zone.availableBays / zone.totalBays) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            )}
+          </Card.Body>
+        </Card>
       </Container>
     </React.Fragment>
   );
