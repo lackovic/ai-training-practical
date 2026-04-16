@@ -111,7 +111,12 @@ const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
   );
 };
 
-const CarParkOverview = () => {
+interface CarParkOverviewProps {
+  isLive: boolean;
+  onStatusChange: (live: boolean) => void;
+}
+
+const CarParkOverview = ({ isLive, onStatusChange }: CarParkOverviewProps) => {
   const [zones, setZones] = useState<ParkingZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,8 +137,10 @@ const CarParkOverview = () => {
   const [simulating, setSimulating] = useState(false);
 
   const refreshZones = useCallback(() =>
-    fetchApi<ParkingZone[]>('/parking/zones').then((data) => setZones(data ?? [])),
-  []);
+    fetchApi<ParkingZone[]>('/parking/zones')
+      .then((data) => { onStatusChange(true); setZones(data ?? []); })
+      .catch((err: Error) => { onStatusChange(false); throw err; }),
+  [onStatusChange]);
 
   useEffect(() => {
     refreshZones()
@@ -152,6 +159,7 @@ const CarParkOverview = () => {
           fetchApi<ParkingBay[]>(`/parking/zones/${zoneId}/bays`),
           fetchApi<ParkingZone[]>('/parking/zones'),
         ]).then(([updatedBays, updatedZones]) => {
+          onStatusChange(true);
           if (updatedBays) setBays(updatedBays);
           if (updatedZones) {
             setZones(updatedZones);
@@ -159,11 +167,11 @@ const CarParkOverview = () => {
               prev ? (updatedZones.find((z) => z.id === prev.id) ?? prev) : null
             );
           }
-        }).catch(() => {});
+        }).catch(() => { onStatusChange(false); });
       } else {
         fetchApi<ParkingZone[]>('/parking/zones')
-          .then((data) => setZones(data ?? []))
-          .catch(() => {});
+          .then((data) => { onStatusChange(true); setZones(data ?? []); })
+          .catch(() => { onStatusChange(false); });
       }
     }, POLL_INTERVAL);
     return () => clearInterval(id);
@@ -287,6 +295,18 @@ const CarParkOverview = () => {
     }
   };
 
+  const liveIndicator = isLive ? (
+    <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+      <Spinner animation="grow" size="sm" />
+      Live
+    </span>
+  ) : (
+    <span className="d-flex align-items-center gap-1 text-danger" style={{ fontSize: '0.75rem' }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
+      Offline
+    </span>
+  );
+
   const isOccupied = bookingBay?.status === 'OCCUPIED';
   const isActioning = bookingBay ? actioningBayId === bookingBay.id : false;
   const canBook = driverName.trim().length > 0 && vehicleReg.trim().length > 0;
@@ -313,10 +333,7 @@ const CarParkOverview = () => {
                 </Button>
                 <Card.Title className="mb-0">{selectedZone.name}</Card.Title>
               </div>
-              <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
-                <Spinner animation="grow" size="sm" />
-                Live
-              </span>
+              {liveIndicator}
             </div>
           ) : (
             <div className="d-flex justify-content-between align-items-start">
@@ -335,10 +352,7 @@ const CarParkOverview = () => {
                     ? <><Spinner animation="border" size="sm" className="me-1" />Simulating…</>
                     : <><Zap size={13} className="me-1" />Rush Hour</>}
                 </Button>
-                <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
-                  <Spinner animation="grow" size="sm" />
-                  Live
-                </span>
+                {liveIndicator}
               </div>
             </div>
           )}

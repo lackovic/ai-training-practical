@@ -19,7 +19,11 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const OccupancyChart = () => {
+interface OccupancyChartProps {
+  onStatusChange: (live: boolean) => void;
+}
+
+const OccupancyChart = ({ onStatusChange }: OccupancyChartProps) => {
   const [data, setData] = useState<OccupancyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +31,10 @@ const OccupancyChart = () => {
 
   const load = useCallback(() => {
     fetchApi<OccupancyData>('/parking/occupancy')
-      .then((d) => setData(d ?? null))
-      .catch((err) => setError(err.message))
+      .then((d) => { onStatusChange(true); setData(d ?? null); setError(null); })
+      .catch((err) => { onStatusChange(false); setError(err.message); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [onStatusChange]);
 
   useEffect(() => {
     load();
