@@ -40,7 +40,7 @@ const BAY_BORDER = '2px solid rgba(255,255,255,0.25)';
 
 interface BaySquareProps {
   bay: ParkingBay;
-  openSide: 'top' | 'bottom';
+  openSide: 'left' | 'right';
   isActioning: boolean;
   onClick: () => void;
 }
@@ -53,8 +53,8 @@ const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
       title={`Bay ${bay.bayNumber} — ${isAvailable ? 'Available (click to book)' : 'Occupied (click to release)'}`}
       onClick={() => !isActioning && onClick()}
       style={{
-        width: '64px',
-        height: '80px',
+        width: '96px',
+        height: '52px',
         flexShrink: 0,
         backgroundColor: bg,
         color: 'white',
@@ -62,15 +62,15 @@ const BaySquare = ({ bay, openSide, isActioning, onClick }: BaySquareProps) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '4px',
+        gap: '2px',
         cursor: isActioning ? 'default' : 'pointer',
         fontSize: '0.75rem',
         fontWeight: '600',
-        borderTop: openSide === 'top' ? 'none' : BAY_BORDER,
-        borderBottom: openSide === 'bottom' ? 'none' : BAY_BORDER,
-        borderLeft: BAY_BORDER,
-        borderRight: BAY_BORDER,
-        borderRadius: openSide === 'bottom' ? '4px 4px 0 0' : '0 0 4px 4px',
+        borderTop: BAY_BORDER,
+        borderBottom: BAY_BORDER,
+        borderLeft: openSide === 'left' ? 'none' : BAY_BORDER,
+        borderRight: openSide === 'right' ? 'none' : BAY_BORDER,
+        borderRadius: openSide === 'right' ? '4px 0 0 4px' : '0 4px 4px 0',
         userSelect: 'none',
         transition: 'background-color 0.15s',
       }}
@@ -141,8 +141,8 @@ const CarParkOverview = () => {
   };
 
   const midpoint = Math.ceil(bays.length / 2);
-  const topBays = bays.slice(0, midpoint);
-  const bottomBays = bays.slice(midpoint);
+  const leftBays = bays.slice(0, midpoint);
+  const rightBays = bays.slice(midpoint);
 
   return (
     <Card>
@@ -228,32 +228,43 @@ const CarParkOverview = () => {
             {baysError && <Alert variant="danger">Failed to load bays: {baysError}</Alert>}
             {!baysLoading && !baysError && (
               <>
-                <div style={{ background: '#ced4da', borderRadius: '8px', padding: '12px', overflowX: 'auto' }}>
-                  {/* Top row — bays open toward the lane below */}
-                  <div style={{ display: 'flex', gap: '3px' }}>
-                    {topBays.map((bay) => (
+                <div style={{ background: '#ced4da', borderRadius: '8px', padding: '16px', display: 'inline-flex', gap: '0' }}>
+                  {/* Left column — bays open toward the aisle on the right */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {leftBays.map((bay) => (
                       <BaySquare
                         key={bay.id}
                         bay={bay}
-                        openSide="bottom"
+                        openSide="right"
                         isActioning={actioningBayId === bay.id}
                         onClick={() => handleBayAction(bay)}
                       />
                     ))}
                   </div>
 
-                  {/* Driving lane */}
-                  <div style={{ height: '40px', background: '#495057', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ width: '100%', borderTop: '2px dashed rgba(173,181,189,0.5)' }} />
+                  {/* Central aisle */}
+                  <div style={{
+                    width: '52px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 0',
+                    color: 'rgba(0,0,0,0.3)',
+                    fontSize: '0.7rem',
+                    userSelect: 'none',
+                  }}>
+                    <span>↓</span>
+                    <span>↑</span>
                   </div>
 
-                  {/* Bottom row — bays open toward the lane above */}
-                  <div style={{ display: 'flex', gap: '3px' }}>
-                    {bottomBays.map((bay) => (
+                  {/* Right column — bays open toward the aisle on the left */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {rightBays.map((bay) => (
                       <BaySquare
                         key={bay.id}
                         bay={bay}
-                        openSide="top"
+                        openSide="left"
                         isActioning={actioningBayId === bay.id}
                         onClick={() => handleBayAction(bay)}
                       />
