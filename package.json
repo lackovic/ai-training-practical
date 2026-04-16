@@ -30,6 +30,7 @@
   "homepage": "https://github.com/robelkin/ai-training#readme",
   "description": "",
   "devDependencies": {
+    "browserify-zlib": "^0.2.0",
     "eslint": "^9.25.1",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
