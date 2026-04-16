@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Row, Col, Card, Spinner, Alert, Button, Modal, Form, Table, InputGroup } from 'react-bootstrap';
-import { ArrowLeft, Search, X } from 'lucide-react';
+import { ArrowLeft, Search, X, Zap } from 'lucide-react';
 import { fetchApi } from '../../../utils/apiClient';
 
 const POLL_INTERVAL = 5000;
+
+const FAKE_DRIVERS = [
+  'Alice Johnson', 'Bob Smith', 'Carol White', 'David Brown', 'Emma Davis',
+  'Frank Miller', 'Grace Wilson', 'Henry Moore', 'Isla Taylor', 'Jack Anderson',
+];
+const FAKE_VEHICLES = [
+  'AB12 CDE', 'XY34 FGH', 'LM56 IJK', 'PQ78 LMN', 'RS90 OPQ',
+  'TU11 VWX', 'YZ22 ABC', 'CD33 EFG', 'HI44 JKL', 'MN55 OPQ',
+];
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 interface ParkingZone {
   id: number;
@@ -119,6 +129,7 @@ const CarParkOverview = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [simulating, setSimulating] = useState(false);
 
   const refreshZones = useCallback(() =>
     fetchApi<ParkingZone[]>('/parking/zones').then((data) => setZones(data ?? [])),
@@ -236,6 +247,46 @@ const CarParkOverview = () => {
     setVehicleReg('');
   };
 
+  const runSimulation = async () => {
+    if (simulating || zones.length === 0) return;
+    setSimulating(true);
+    try {
+      // Fetch all bays across every zone in parallel
+      const bayArrays = await Promise.all(
+        zones.map((z) => fetchApi<ParkingBay[]>(`/parking/zones/${z.id}/bays`))
+      );
+      const allBays = (bayArrays.flat().filter(Boolean) as ParkingBay[]);
+
+      const available = allBays.filter((b) => b.status === 'AVAILABLE');
+      const occupied  = allBays.filter((b) => b.status === 'OCCUPIED');
+
+      // Rush hour: book up to 7 bays, release up to 3 — shuffle for a natural feel
+      const toBook    = available.sort(() => Math.random() - 0.5).slice(0, Math.min(7, available.length));
+      const toRelease = occupied.sort(() => Math.random() - 0.5).slice(0, Math.min(3, occupied.length));
+
+      type Action = () => Promise<unknown>;
+      const actions: Action[] = [
+        ...toBook.map((bay) => () =>
+          fetchApi(`/parking/bays/${bay.id}/book`, {
+            method: 'POST',
+            body: JSON.stringify({ driverName: pick(FAKE_DRIVERS), vehicleRegistration: pick(FAKE_VEHICLES) }),
+          })
+        ),
+        ...toRelease.map((bay) => () =>
+          fetchApi(`/parking/bays/${bay.id}/release`, { method: 'POST' })
+        ),
+      ].sort(() => Math.random() - 0.5);
+
+      for (const action of actions) {
+        await new Promise((r) => setTimeout(r, 400 + Math.random() * 350));
+        await action().catch(() => {}); // ignore conflicts (bay state may have changed)
+        refreshZones();
+      }
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   const isOccupied = bookingBay?.status === 'OCCUPIED';
   const isActioning = bookingBay ? actioningBayId === bookingBay.id : false;
   const canBook = driverName.trim().length > 0 && vehicleReg.trim().length > 0;
@@ -273,10 +324,22 @@ const CarParkOverview = () => {
                 <Card.Title className="mb-0">Car Park Overview</Card.Title>
                 <h6 className="card-subtitle text-muted">Click a zone to manage bays</h6>
               </div>
-              <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
-                <Spinner animation="grow" size="sm" />
-                Live
-              </span>
+              <div className="d-flex align-items-center gap-2">
+                <Button
+                  variant="outline-warning"
+                  size="sm"
+                  onClick={runSimulation}
+                  disabled={simulating || loading}
+                >
+                  {simulating
+                    ? <><Spinner animation="border" size="sm" className="me-1" />Simulating…</>
+                    : <><Zap size={13} className="me-1" />Rush Hour</>}
+                </Button>
+                <span className="d-flex align-items-center gap-1 text-success" style={{ fontSize: '0.75rem' }}>
+                  <Spinner animation="grow" size="sm" />
+                  Live
+                </span>
+              </div>
             </div>
           )}
         </Card.Header>
