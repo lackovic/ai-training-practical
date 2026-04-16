@@ -32,7 +32,8 @@ function getAvailabilityLabel(availableBays: number, totalBays: number): string 
   const ratio = availableBays / totalBays;
   if (ratio > 0.6) return 'Mostly free';
   if (ratio >= 0.3) return 'Filling up';
-  return 'Nearly full';
+  if (ratio > 0) return 'Nearly full';
+  return 'Full';
 }
 
 const CarParkOverview = () => {
